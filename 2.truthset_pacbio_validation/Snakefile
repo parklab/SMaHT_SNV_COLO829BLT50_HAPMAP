@@ -1,0 +1,69 @@
+# Snakefile
+
+ref = "/n/data1/hms/dbmi/park-smaht_dac/ref/GRCh38_no_alt/hg38_no_alt.fa"
+
+import os, glob
+
+basedir     = "/n/data1/hms/dbmi/park/jiny/SMaHT/COLO829/0.truthset/0.calls_Illumina/"
+input_dir   = os.path.join(basedir, "input")
+inputvcf_dir   = os.path.join(basedir, "PU_minipileup")
+output_dir = os.path.join(basedir, "PU_bcftools")
+
+vcf_files = [f for f in os.listdir(input_dir) if f.endswith("snv.vcf.gz")]  
+idx_list  = [vcf.replace(".vcf.gz", "") for vcf in vcf_files]
+CHROMS = ["chr"+str(i) for i in range(1,23)] + ["chrX","chrY"]
+
+bam_dir  = "/n/data1/hms/dbmi/park/jiny/SMaHT/COLO829/truthset_updated/bams"
+bam_t    = os.path.join(bam_dir, "COLO829T_Hifi.bam")
+bam_bl   = os.path.join(bam_dir, "COLO829BL_Hifi.bam")
+bcftools="/home/cos689/software/bin/bcftools"
+
+rule all:
+    input:
+        # for each sample (idx) and each chrom, expect the normalized pileup
+        expand(
+            os.path.join(output_dir, "{idx}.{chrom}.PU.norm.vcf.gz"),
+            idx=idx_list,
+            chrom=CHROMS
+        ),
+
+
+
+rule Pileup_LR:
+    """
+    Run minipileup with PacBio COLO829 and COLO829BL
+    """
+    input:
+        vcf   = os.path.join(inputvcf_dir, "{idx}.{chrom}.vcf.gz"),
+        bams  = lambda wc: [bam_t, bam_bl]
+    output:
+        vcf   = os.path.join(output_dir, "{idx}.{chrom}.PU.vcf.gz"),
+        norm_vcf = os.path.join(output_dir, "{idx}.{chrom}.PU.norm.vcf.gz"),
+    threads: 1
+    resources:
+        mem_mb=5000,
+        runtime=1200
+    shell:
+        """
+        {bcftools} mpileup \
+            --fasta-ref /n/data1/hms/dbmi/park-smaht_dac/ref/GRCh38_no_alt/hg38_no_alt.fa \
+            --threads 1 \
+            --regions-file {input.vcf} \
+            --annotate AD \
+            --max-depth 3000 \
+            --min-BQ 20 \
+            --min-MQ 1 \
+            --ignore-RG \
+            --ns SUPPLEMENTARY,UNMAP,SECONDARY,QCFAIL,DUP \
+            {input.bams} -O z \
+            -o {output.vcf} --threads 1
+        {bcftools} norm -a  -m- -f {ref} {output.vcf} > {output.norm_vcf}
+        """
+"""
+minipu="/n/data1/hms/dbmi/park/dominika/tools/minipileup/minipileup"
+{minipu} \
+    -b {input.vcf} \
+    {input.bams[0]} {input.bams[1]} \
+    -q 1 -Q 20 -v -e -S 9999999 > \
+    {output.vcf}
+"""

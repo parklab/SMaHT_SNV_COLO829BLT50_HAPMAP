@@ -1,0 +1,60 @@
+#configfile: "/home/dm334/park_home/testing/smaht/MF_experiment/scripts/snakemake/config/config2.yaml"
+mutect2_path = config['mutect2_path']
+mutect2_original=config["mutect2_original"]
+
+rule all:
+    input:
+        directory(f"{mutect2_path}/splits"),
+        f"{mutect2_path}/splits/JOBS"
+
+
+rule Mutect2_RegionFilter:
+    input:
+        {mutect2_original}
+    output:
+        f"{mutect2_path}/RepeatFiltered_full.vcf"
+    resources:
+        mem_mb=8000,
+        runtime=60  # 1 hour
+    log:
+        "logs/RegionFilter.log"
+    shell:
+        """
+        module load gcc
+        module load bedtools
+        mkdir -p {mutect2_path}
+        cp {mutect2_original} {mutect2_path}
+        VCF={input}
+        gunzip -c $VCF | grep "^#" > {mutect2_path}/RepeatFiltered_header.vcf
+        bedtools intersect -v -a $VCF -b /n/data1/hms/dbmi/park/jiny/resources/MosaicForecast/region_clus_segdup.s.m.bed > {mutect2_path}/RepeatFiltered.vcf
+        cat {mutect2_path}/RepeatFiltered_header.vcf {mutect2_path}/RepeatFiltered.vcf > {output}
+        """
+
+rule Mutect_Normalize:
+    input:
+        #{mutect2_original}
+        f"{mutect2_path}/RepeatFiltered_full.vcf"
+    output:
+        f"{mutect2_path}/RepeatFiltered_full.normed.vcf"
+    resources:
+        mem_mb=8000,
+        runtime=5  # 1 hour
+    shell:
+        """
+        bcftools norm -a -m-both -f /n/data1/hms/dbmi/park/SOFTWARE/REFERENCE/GRCh38_smaht/hg38_no_alt.fa -o {output} {input}
+        """
+
+rule Mutect2_split_chromosomes:
+    input:
+        vcf=f"{mutect2_path}/RepeatFiltered_full.normed.vcf"
+    output:
+        directory(f"{mutect2_path}/splits"),
+        f"{mutect2_path}/splits/JOBS"
+    resources:
+        mem_mb=8000,
+        runtime=5 
+    shell:
+        """
+        mkdir -p {mutect2_path}/splits
+        bash /home/dm334/projects/smaht/split_vcf.sh {input.vcf} {mutect2_path}/splits
+        """

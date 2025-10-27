@@ -1,0 +1,141 @@
+import os
+
+configfile: "/n/data1/hms/dbmi/park/jiny/SMaHT/COLO829/2.Github/3.negative_control/Snakemake/config/config.yaml"
+
+start = int(config.get("start", 0))
+end   = int(config.get("end", 1))
+JOB_IDS = list(map(str, range(start, end + 1)))
+
+REF_FA   = config["ref_fa"]
+PB_T_BAM = config["pacbio"]["tumor_bam"]
+PB_N_BAM = config["pacbio"]["normal_bam"]
+IL_T_BAM = config["illumina"]["tumor_bam"]
+IL_N_BAM = config["illumina"]["normal_bam"]
+
+BED1 = config["beds"]["homref_candidates"]  # contains {job_id}
+BED2 = config["beds"]["for_step2"]          # contains {job_id}
+BED3 = config["beds"]["to_check_in_illumina"]  # contains {job_id}
+
+SCRIPTS = config["scripts"]  # absolute dir with 2.Mpileup.sh etc.
+
+rule all:
+    input:
+        expand("results/CrossCheck_{job_id}.done", job_id=JOB_IDS)
+
+# PU=1 PacBio mpileup uses precomputed BED1
+rule pacbio_pu1:
+    input:
+        ref = REF_FA,
+        bed = BED1.format(job_id="{job_id}")     # wildcard string (no lambda)
+    output:
+        vcf = "PU1_PacBio/PU1_PacBio_{job_id}.norm.vcf"
+    params:
+        outdir = "PU1_PacBio",
+        prefix = "PU1_PacBio",
+        pu_t = 1, pu_n = 1,
+        tumor = PB_T_BAM, normal = PB_N_BAM,
+        scripts = SCRIPTS
+    shell:
+        r"""
+        mkdir -p {params.outdir}
+        echo {input.bed}
+
+        bash {params.scripts}/2.Mpileup.sh {input.ref} \
+            {params.outdir}/ {params.prefix} "{input.bed}" "{wildcards.job_id}" \
+            {params.pu_t} {params.pu_n} {params.tumor} {params.normal}
+        """
+
+# Step 3: from PU1 VCF -> script writes BED2 at its fixed absolute path
+rule make_for_step2_bed:
+    input:
+        vcf = "PU1_PacBio/PU1_PacBio_{job_id}.norm.vcf"
+    output:
+        bed = BED2.format(job_id="{job_id}")
+    params:
+        scripts = SCRIPTS
+    log:
+        "logs/make_bed2_{job_id}.log"
+    shell:
+        r"""
+        mkdir -p "$(dirname {output.bed})" logs
+        python3 {params.scripts}/3.HomRefSitesPacBio.py {input.vcf} {wildcards.job_id} > {log} 2>&1
+        test -s "{output.bed}" || (echo "Expected BED2 not created: {output.bed}" >> {log} && exit 1)
+        """
+
+# PU=30 PacBio mpileup consumes fixed BED2
+rule pacbio_pu30:
+    input:
+        ref = REF_FA,
+        bed = BED2.format(job_id="{job_id}")
+    output:
+        vcf = "PU30_PacBio/PU30_PacBio_{job_id}.norm.vcf"
+    params:
+        outdir = "PU30_PacBio",
+        prefix = "PU30_PacBio",
+        pu_t = 30, pu_n = 30,
+        tumor = PB_T_BAM, normal = PB_N_BAM,
+        scripts = SCRIPTS
+
+    shell:
+        r"""
+        mkdir -p {params.outdir}
+        bash {params.scripts}/2.Mpileup.sh {input.ref} \
+            {params.outdir}/ {params.prefix} "{input.bed}" \
+            {params.pu_t} {params.pu_n} {params.tumor} {params.normal} 
+        """
+
+# Step 4: from PU30 VCF -> script writes BED3 at its fixed absolute path
+rule make_to_check_in_illumina_bed:
+    input:
+        vcf = "PU30_PacBio/PU30_PacBio_{job_id}.norm.vcf"
+    output:
+        bed = BED3.format(job_id="{job_id}")
+    params:
+        scripts = SCRIPTS
+    log:
+        "logs/make_bed3_{job_id}.log"
+    shell:
+        r"""
+        mkdir -p "$(dirname {output.bed})" logs
+        # If the script prints to stdout instead, change to: python3 ... > {output.bed} 2> {log}
+        python3 {params.scripts}/4.IlluminaCrossCheckSites.py {input.vcf} {wildcards.job_id} 
+        #test -s "{output.bed}" || (echo "Expected BED3 not created: {output.bed}" >> {log} && exit 1)
+        """
+
+# Illumina PU=1 mpileup consumes fixed BED3
+rule illumina_pu1:
+    input:
+        ref = REF_FA,
+        bed = BED3.format(job_id="{job_id}")
+    output:
+        vcf = "PU1_Illumina/PU1_Illumina_{job_id}.norm.vcf"
+    params:
+        outdir = "PU1_Illumina",
+        prefix = "PU1_Illumina",
+        pu_t = 1, pu_n = 1,
+        tumor = IL_T_BAM, normal = IL_N_BAM,
+        scripts = SCRIPTS
+
+    shell:
+        r"""
+        mkdir -p {params.outdir}
+        bash {params.scripts}/2.Mpileup.sh {input.ref} \
+            {params.outdir}/ {params.prefix} "{input.bed}" \
+            {params.pu_t} {params.pu_n} {params.tumor} {params.normal}
+        """
+
+# Final cross-check
+rule crosscheck_pacbio_illumina:
+    input:
+        vcf = "PU1_Illumina/PU1_Illumina_{job_id}.norm.vcf"
+    output:
+        done = "results/CrossCheck_{job_id}.done"
+    params:
+        scripts = SCRIPTS
+
+    shell:
+        r"""
+        mkdir -p results logs
+        python3 {params.scripts}/5.CrossCheckPacBioIllumina.py {input.vcf} {wildcards.job_id}
+        touch {output.done}
+        """

@@ -1,0 +1,92 @@
+"""
+Snakemake pipeline to run Sentieon TNHaplotyper2 (Mutect2) at scale.
+The pipeline runs: TNHaplotyper2, ContaminationBias, ContaminationModel, Merging of VCFs, TNFilter 
+"""
+
+SCRIPTS_PATH = os.path.abspath(os.path.join(workflow.basedir, "..", "scripts"))
+
+
+genome_version = config["genome_version"]
+SHARDS_LEN = config[genome_version]["shards_len"]
+indeces  = list(range(0, SHARDS_LEN + 1))
+
+sample_name = config['sample_name']
+sample_bams = config["sample_bams"]
+normal_name = config['normal_name']
+normal_bams = config['normal_bams']
+folder = config["folder"]
+output_folder = config["output_folder"]
+
+REFERENCE = config[genome_version]["reference"]
+SHARDS= config[genome_version]["shards"]
+POP_AF = config[genome_version]["pop_af"]
+
+def scale_by_attempt(base_mb):
+    def _scale_by_attempt(wildcards, attempt):
+        return base_mb*attempt
+    return _scale_by_attempt
+
+
+rule all:
+    input:
+        expand("{output_folder}/{sample_name}/{folder}/output.vcf.gz", sample_name=sample_name, folder=folder, output_folder=output_folder),
+        expand("{output_folder}/{sample_name}/{folder}/output.vcf.gz.tbi", sample_name=sample_name, folder=folder, output_folder=output_folder),
+        expand("{output_folder}/{sample_name}/{folder}/output.vcf.gz.stats", sample_name=sample_name, folder=folder, output_folder=output_folder),
+        expand("{output_folder}/{sample_name}/{folder}/merged.contamination", sample_name=sample_name, folder=folder, output_folder=output_folder),
+        expand("{output_folder}/{sample_name}/{folder}/merged.priors", sample_name=sample_name, folder=folder, output_folder=output_folder),
+        expand("{output_folder}/{sample_name}/{folder}/merged.segments", sample_name=sample_name, folder=folder, output_folder=output_folder),
+rule TNHaplotyper2:
+    input:
+        sample_bams=sample_bams,
+        normal_bams=normal_bams,
+    output:
+        "{output_folder}/{sample_name}/{folder}/TNH2_{index}/output.vcf.gz",
+        "{output_folder}/{sample_name}/{folder}/TNH2_{index}/output.vcf.gz.tbi"
+    resources:
+        mem_mb=scale_by_attempt(1024*8),
+        runtime=60*1,
+        cpus_per_task=8
+    shell:
+        """
+        export REFERENCE={REFERENCE}
+        export SHARDS={SHARDS}
+        export POP_AF={POP_AF}
+        bash {SCRIPTS_PATH}/run_sentieon_TNhaplotyper2_wOrientationBias_ContaminationModel_normal.sh \
+        -s {sample_name} \
+        -t {input.sample_bams} \
+        -n {normal_name} \
+        -m {input.normal_bams} \
+        -f {folder} \
+        -i {wildcards.index} \
+        -o {output_folder}
+        """
+
+rule TNFilter:
+    input:
+        expand(
+            "{output_folder}/{sample_name}/{folder}/TNH2_{index}/output.vcf.gz", 
+            index=indeces, sample_name=sample_name, folder=folder, output_folder=output_folder
+        ),
+        expand(
+            "{output_folder}/{sample_name}/{folder}/TNH2_{index}/output.vcf.gz.tbi", 
+            index=indeces, sample_name=sample_name, folder=folder, output_folder=output_folder
+        )
+    output:
+        "{output_folder}/{sample_name}/{folder}/output.vcf.gz",
+        "{output_folder}/{sample_name}/{folder}/output.vcf.gz.tbi",
+        "{output_folder}/{sample_name}/{folder}/output.vcf.gz.stats",
+        "{output_folder}/{sample_name}/{folder}/merged.contamination",
+        "{output_folder}/{sample_name}/{folder}/merged.priors",
+        "{output_folder}/{sample_name}/{folder}/merged.segments"
+
+    resources:
+        mem_mb=1024*32,
+        runtime=lambda wildcards, attempt: min(base_time + (attempt * 120), 600),  # 1 hour max
+        cpus_per_task=16
+    shell:
+        """
+        export REFERENCE={REFERENCE}
+        export SHARDS={SHARDS}
+        export POP_AF={POP_AF}
+        bash {SCRIPTS_PATH}/submit_TNFilter_normal.sh {wildcards.sample_name}/{wildcards.folder} {wildcards.sample_name} {normal_name} {output_folder} {SHARDS_LEN}
+        """

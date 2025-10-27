@@ -1,0 +1,99 @@
+#configfile: "/home/dm334/park_home/testing/smaht/MF_experiment/scripts/snakemake/config/config2.yaml"
+# EXAMPLE COMMAND:
+"""
+snakemake --snakefile /n/data1/hms/dbmi/park/dominika/testing/smaht/github/bioinfo/SMaHT/sentieon_tnhaplotyper2/tumor_only/snakemake/Snakefile  --executor slurm --default-resources slurm_account=park_contrib  slurm_partition=park --jobs 24 --configfile /n/scratch/users/d/dm334/tg_paper/reproduce/config/tumor_only/hg002_hiseq_tumor_only_realign_bqsr.yaml /n/data1/hms/dbmi/park/dominika/testing/smaht/github/bioinfo/SMaHT/sentieon_tnhaplotyper2/tumor_normal/snakemake/profiles/o2_human_genomes/config.yaml 
+"""
+genome_version = config["genome_version"]
+
+SHARDS_LEN = config[genome_version]["shards_len"]
+indeces  = list(range(0, SHARDS_LEN + 1))
+
+sample_name = config['sample_name']
+sample_bams = config["sample_bams"]
+folder = config["folder"]
+output_folder = config["output_folder"]
+
+REFERENCE = config[genome_version]["reference"]
+SHARDS= config[genome_version]["shards"]
+POP_AF = config[genome_version]["pop_af"]
+PON_FLAG = False
+PON=""
+
+def scale_by_attempt(base_mb):
+    def _scale_by_attempt(wildcards, attempt):
+        return base_mb*attempt
+    return _scale_by_attempt
+
+def get_process_mem_mb(wildcards, attempt):
+    num_input=len(get_process_input(wildcards))
+    return get_feature_config(wildcards)['mem_mb']*num_input*attempt
+
+
+if "pon" in config.keys():
+    if config["pon"] == True:
+        PON_FLAG = "true"
+        PON = config[genome_version]["pon"]
+
+
+rule all:
+    input:
+        expand("{output_folder}/{sample_name}/{folder}/output.vcf.gz", sample_name=sample_name, folder=folder, output_folder=output_folder),
+        expand("{output_folder}/{sample_name}/{folder}/output.vcf.gz.tbi", sample_name=sample_name, folder=folder, output_folder=output_folder),
+        expand("{output_folder}/{sample_name}/{folder}/output.vcf.gz.stats", sample_name=sample_name, folder=folder, output_folder=output_folder),
+        expand("{output_folder}/{sample_name}/{folder}/merged.contamination", sample_name=sample_name, folder=folder, output_folder=output_folder),
+        expand("{output_folder}/{sample_name}/{folder}/merged.priors", sample_name=sample_name, folder=folder, output_folder=output_folder),
+        expand("{output_folder}/{sample_name}/{folder}/merged.segments", sample_name=sample_name, folder=folder, output_folder=output_folder),
+rule TNHaplotyper2:
+    input:
+        sample_bams=sample_bams,
+    output:
+        "{output_folder}/{sample_name}/{folder}/TNH2_{index}/output.vcf.gz",
+        "{output_folder}/{sample_name}/{folder}/TNH2_{index}/output.vcf.gz.tbi"
+    resources:
+        mem_mb=1024*8,
+        runtime=60*1,
+        cpus_per_task=16
+    shell:
+        """
+        export REFERENCE={REFERENCE}
+        export SHARDS={SHARDS}
+        export POP_AF={POP_AF}
+        export PON_FLAG={PON_FLAG}
+        export PON={PON}
+        
+        bash ../scripts/run_sentieon_TNhaplotyper2_wOrientationBias_ContaminationModel.sh \
+        -s {sample_name} \
+        -t {input.sample_bams} \
+        -f {folder} \
+        -i {wildcards.index} \
+        -o {output_folder}
+        """
+
+rule TNFilter:
+    input:
+        expand(
+            "{output_folder}/{sample_name}/{folder}/TNH2_{index}/output.vcf.gz", 
+            index=indeces, sample_name=sample_name, folder=folder, output_folder=output_folder
+        ),
+        expand(
+            "{output_folder}/{sample_name}/{folder}/TNH2_{index}/output.vcf.gz.tbi", 
+            index=indeces, sample_name=sample_name, folder=folder, output_folder=output_folder
+        )
+    output:
+        "{output_folder}/{sample_name}/{folder}/output.vcf.gz",
+        "{output_folder}/{sample_name}/{folder}/output.vcf.gz.tbi",
+        "{output_folder}/{sample_name}/{folder}/output.vcf.gz.stats",
+        "{output_folder}/{sample_name}/{folder}/merged.contamination",
+        "{output_folder}/{sample_name}/{folder}/merged.priors",
+        "{output_folder}/{sample_name}/{folder}/merged.segments"
+    resources:
+        mem_mb=1024*54,
+        runtime=lambda wildcards, attempt: min(base_time + (attempt * 120), 600),  # 1 hour max
+        cpus_per_task=16
+    shell:
+        """
+        export REFERENCE={REFERENCE}
+        export SHARDS={SHARDS}
+        export POP_AF={POP_AF}
+        bash ../scripts/submit_TNFilter.sh {wildcards.sample_name} {output_folder} {wildcards.folder} {SHARDS_LEN}
+        """

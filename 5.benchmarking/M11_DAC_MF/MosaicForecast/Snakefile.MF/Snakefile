@@ -1,0 +1,152 @@
+mutect2_path = config['mutect2_path']
+mutect2_original=config["mutect2_original"]
+mf_output = config['mf_output']
+bam_folder=config['bam_folder']
+bam_name = config["bam_name"]
+
+bam_path = bam_folder + bam_name + ".bam"
+umap=config["umap"]
+jobs_nb = config["jobs"]
+model = config["model"]
+jobs = list(range(1,config["jobs"]))
+
+rule all:
+    input:
+        expand("{mf_output}/{bam_name}.SNV.predictions.mosaic", mf_output=mf_output, bam_name= bam_name),
+        expand("{mf_output}/{bam_name}.DEL.predictions", mf_output=mf_output, bam_name= bam_name),
+        expand("{mf_output}/{bam_name}.INS.predictions" , mf_output=mf_output, bam_name= bam_name)
+
+rule MF:
+    input:
+        vcf=f"{mutect2_path}/splits/part_{{job}}.vcf.gz"
+    output:
+        f"{mf_output}/output/{{job}}/output.features"
+    resources:
+        mem_mb=4*1024,
+        runtime=60*24,  # 1 hour
+        cpus_per_task=2
+    shell:
+        """
+        Input_VCF={input.vcf}
+        BED="{mf_output}/bed/{wildcards.job}.bed"
+        BamPath={bam_folder}
+        #echo  $BamPath $OutPath  $model
+
+        samplename={bam_name}
+
+        mkdir -p $(dirname $BED)
+
+        #gunzip $Input_VCF.gz
+        gunzip -c $Input_VCF | awk -v val=$samplename 'BEGIN {{OFS="\\t"}} !/^#/ {{gsub(/;/,"\\t",$8); print $1, $2-1, $2, $4, $5, val}}'  > $BED
+
+        mkdir -p {mf_output}/output/{wildcards.job}/ 
+        singularity exec  \
+        -B /n/data1/hms/dbmi/park/dominika/,$(dirname $BED),$(realpath {bam_path}),$BamPath,$HOME,$SCRATCH,/n/data1/hms/dbmi/park/SOFTWARE/REFERENCE/,/n/data1/hms/dbmi/park/jiny/SMaHT/COLO829/Benchmark/Variants/workflow/dash/,/n/data1/hms/dbmi/park-smaht_dac/analysis/,/n/data1/hms/dbmi/park-smaht_dac/DATA/ \
+        /n/app/containers/shared/park-smaht_dac/mosaicforecast_0.0.1.sif \
+        mosaic_forecast_readlevelfeatures.sh \
+        --bam-dir $BamPath \
+        --output-dir {mf_output}/output/{wildcards.job}/ \
+        --ref-fasta  /n/data1/hms/dbmi/park/dominika/MF_resources/GRCh38_smaht/hg38_no_alt.fa \
+        --input-positions_bed $BED \
+        --umap /n/data1/hms/dbmi/park/dominika/MF_resources/umap/k24.umap.wg.bw \
+        --threads 8 \
+        --model {model}
+        """
+
+rule merge_features:
+    input:
+        expand(f"{mf_output}/output/{{job}}/output.features", job=jobs) 
+    output:
+        f"{mf_output}/output/merged_output.features"
+    resources:
+        mem_mb=1024,
+        runtime=60,  # 1 hour
+        cpus_per_task=1
+    shell:
+        """
+        bash /home/dm334/park_home/testing/smaht/MF_experiment/scripts/merge_output_features.sh {mf_output}/output/ {jobs_nb}
+        """
+
+rule prediction_SNV:
+    input:
+        features=f"{mf_output}/output/merged_output.features"
+    output:
+        f"{mf_output}/{bam_name}.SNV.predictions.mosaic",
+        f"{jiny_folder}/{bam_name}.SNV.predictions",
+        f"{jiny_folder}/{bam_name}.vcf.gz",
+        f"{jiny_folder_repeat}/{bam_name}.vcf.gz"
+    resources:
+        mem_mb=16*1024,
+        runtime=60,  # 1 hour
+        cpus_per_task=1
+    shell:
+        """
+        min_dp_inforSNPs=20
+        n_threads=1
+
+                
+        singularity exec -B /n/data1/hms/dbmi/park/dominika/MF_resources/MosaicForecast/models_trained/,$(dirname {input.features}),{mf_output} \
+        /n/app/containers/shared/park-smaht_dac/mosaicforecast_0.0.1.sif \
+        Rscript /usr/local/bin/Prediction.R \
+        {input.features} \
+        {model} \
+        Refine \
+        {mf_output}/output.SNV.predictions
+
+        python3 /home/dm334/park_home/testing/smaht/pipelines/MosaicForecast/MF_to_vcf.py {mf_output}/output.SNV.predictions  {mf_output}/{bam_name}.SNV.vcf
+        cat {mf_output}/output.SNV.predictions | grep SNP | egrep "mosaic_likelihood|mosaic" > {mf_output}/{bam_name}.SNV.predictions.mosaic
+        python3 /home/dm334/park_home/testing/smaht/pipelines/MosaicForecast/MF_to_vcf.py {mf_output}/{bam_name}.SNV.predictions.mosaic  {mf_output}/{bam_name}.VCF
+        """
+
+rule predicition_indels:
+    input:
+        features=f"{mf_output}/output/merged_output.features"
+    output:
+        f"{mf_output}/{bam_name}.DEL.predictions",
+        f"{mf_output}/{bam_name}.DEL.final.vcf","
+
+    resources:
+        mem_mb=8*1024,
+        runtime=60,  # 1 hour
+        cpus_per_task=1
+    shell:
+        """
+        singularity exec -B /n/data1/hms/dbmi/park/dominika/testing/smaht/negative_control/WGS/Illumina/MosaicForecast/model/,$(dirname {input.features}),{mf_output} \
+        /n/app/containers/shared/park-smaht_dac/mosaicforecast_0.0.1.sif \
+        Rscript /usr/local/bin/Prediction.R \
+        {input.features} \
+        /n/data1/hms/dbmi/park/dominika/testing/smaht/negative_control/WGS/Illumina/MosaicForecast/model/deletions_250x.RF.rds \
+        Refine \
+        {mf_output}/{bam_name}.DEL.predictions
+
+        grep DEL {mf_output}/{bam_name}.DEL.predictions | grep "hap=3" > {mf_output}/{bam_name}.DEL.final.predictions
+        python3 /home/dm334/park_home/testing/smaht/pipelines/MosaicForecast/MF_to_vcf.py {mf_output}/{bam_name}.DEL.final.predictions  {mf_output}/{bam_name}.DEL.vcf
+        
+        bedtools intersect -v -a {mf_output}/{bam_name}.DEL.vcf -b /n/data1/hms/dbmi/park/jiny/resources/MosaicForecast/regregion_clus_sRepeat_segdup.s.m.bed > {mf_output}/{bam_name}.DEL.final.vcf 
+        """
+
+rule predicition_insertions:
+    input:
+        features=f"{mf_output}/output/merged_output.features"
+    output:
+        f"{mf_output}/{bam_name}.INS.predictions",
+        f"{jiny_folder}/{bam_name}.INS.predictions"
+    resources:
+        mem_mb=8*1024,
+        runtime=60,  # 1 hour
+        cpus_per_task=1
+    shell:
+        """
+        singularity exec -B /n/data1/hms/dbmi/park/dominika/testing/smaht/negative_control/WGS/Illumina/MosaicForecast/model/,$(dirname {input.features}),{mf_output} \
+        /n/app/containers/shared/park-smaht_dac/mosaicforecast_0.0.1.sif \
+        Rscript /usr/local/bin/Prediction.R \
+        {input.features} \
+        /n/data1/hms/dbmi/park/dominika/testing/smaht/negative_control/WGS/Illumina/MosaicForecast/model/insertions_250x.RF.rds \
+        Refine \
+        {mf_output}/{bam_name}.INS.predictions
+        
+        grep INS {mf_output}/{bam_name}.INS.predictions | grep "hap=3" > {mf_output}/{bam_name}.INS.final.predictions
+        python3 /home/dm334/park_home/testing/smaht/pipelines/MosaicForecast/MF_to_vcf.py {mf_output}/{bam_name}.INS.final.predictions  {mf_output}/{bam_name}.INS.vcf
+        
+        bedtools intersect -v -a {mf_output}/{bam_name}.INS.vcf -b /n/data1/hms/dbmi/park/jiny/resources/MosaicForecast/regregion_clus_sRepeat_segdup.s.m.bed > {mf_output}/{bam_name}.INS.final.vcf 
+        """
