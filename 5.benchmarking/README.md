@@ -21,8 +21,6 @@ Performance was reported in terms of sensitivity, precision, and F1 score strati
 - **`Annotate.sh`** — Shell pipeline that annotates each submitted call set against the reference mutation set, negative-control BED regions, and a germline VCF (COLO829BL). It intersects candidate VCFs with BED files per genomic region and prepares the annotated inputs consumed by the evaluation notebook.
 - **`Evaluation_challenge.ipynb`** — Jupyter notebook that computes per-pipeline benchmarking metrics (sensitivity, precision, F1) across VAF bins and sequencing depths, and generates the figures comparing the twelve participating pipelines (Fig. 4 in the manuscript). It also stratifies performance by genomic context (easy / difficult / extreme) using the region definitions in [`Resource`](../Resource).
 
-> Note: The `M11_DAC_MF` subdirectory is not described here.
-
 ## Workflow Summary
 
 1. Collect VCF submissions from each participating pipeline applied to the five biological (and *in silico*) COLO829BLT50 datasets.
