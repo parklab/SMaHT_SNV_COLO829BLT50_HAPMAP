@@ -3,12 +3,12 @@ This repository contains analysis scripts for the manuscript: "Detecting low all
 This work is part of the Somatic Mosaicism across Human Tissues (SMaHT) Network effort to establish best practices for identifying somatic variants with low allele frequency in healthy tissues. 
 
 ## Introduction
-We designed a comprehensive benchmarking study to evaluate and address the challenges of detecting somatic mutations at low and ultra-low VAFs, focusing on variants with VAF below 3%, but ranging from below 1% to over 15%.
+We designed a comprehensive benchmarking study to evaluate and address the challenges of detecting somatic mutations at low and ultra-low VAFs, focusing on variants with VAF below 3%, ranging from below 1% to over 15%.
 
 ### Experimental Design
-We employed two experimental designs to artifically generate samples with low VAF variants with known ground-truth:
+We employed two experimental designs to artificially generate samples with low VAF variants with known ground-truth:
 - COLO829BLT50 Mixture: A biologically controlled mixture of 2% COLO829 (melanoma cell line) and 98% COLO829BL (matched normal) to generate somatic variants below 3% VAF. 
-- HapMap Mixture: A mixture of six well-characterized HapMap samples at various fractions to generate artifical somatic variants with VAFs ranging from as low as 0.25% up to 16.5%.
+- HapMap Mixture: A mixture of six well-characterized HapMap samples at various fractions to generate artificial somatic variants with VAFs ranging from as low as 0.25% up to 16.5%.
 
 To ensure a high-confidence benchmark, we combined diverse sequencing technologies and specialized computational approaches to generate reliable reference variant sets, benchmark somatic variant calling approaches, and provide  recommendations.
 
@@ -27,11 +27,11 @@ as well as the
 [culture variants](Resource/Truthset_CultureDerived_SNV_COLO829.txt)
  are provided in the [Resource](Resource) directory.
 
-As the cell lines were cultured in preparation for the generation of the COLO829BLT50 mixture, they acquired *de novo* variants that are absent from the initial COLO829 tumor and COLO829BL matched normal cell line . How those admixture-specific variants were identified is described in 
+As the cell lines were cultured in preparation for the generation of the COLO829BLT50 mixture, they acquired *de novo* variants that are absent from the initial COLO829 tumor and COLO829BL matched normal cell line. How those admixture-specific variants were identified is described in 
 [4.admixture-only](4.admixture-only).
 
-We benchmarked 12 different somatic variant calling approaches against the thoroughly prepared reference set of variants. All approaches are described in detail in the accompaning publication. While 11 approaces were provided by other groups in the SMaHT consortia, we employed Mutect2 and MosaicForecast in our provided approach. Details are described in 
-[5.benchmarking](5.benchmarking). Additionally, to mitigate recurrent, alignment-driven false positive SNVs enriched in difficult and extreme genomic regions, we implemented a cross-sample pileup filtering workflow using an independent control sample, which we recommend as best practise. Details for this recommended filtering step are described in 
+We benchmarked 12 different somatic variant calling approaches against the thoroughly prepared reference set of variants. All approaches are described in detail in the accompanying publication. While 11 approaches were provided by other groups in the SMaHT consortia, we employed Mutect2 and MosaicForecast in our provided approach. Details are described in 
+[5.benchmarking](5.benchmarking). Additionally, to mitigate recurrent, alignment-driven false positive SNVs enriched in difficult and extreme genomic regions, we implemented a cross-sample pileup filtering workflow using an independent control sample, which we recommend as best practice. Details for this recommended filtering step are described in 
 [8.cross-platform_artifact_filtering](8.cross-platform_artifact_filtering). 
 The resulting call sets of all 12 approaches can be found in [7.call_sets](7.call_sets).
 
