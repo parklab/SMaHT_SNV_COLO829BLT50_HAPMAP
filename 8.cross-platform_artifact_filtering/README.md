@@ -17,7 +17,7 @@ Variants were retained only if supported by >1 alternate read in the target samp
 - tabix
 - GNU parallel
 - Python ≥ 3.8
-- granite (vcf_parser module)
+- granite-suite (vcf_parser module)
 
 ## Control BAM sample
 

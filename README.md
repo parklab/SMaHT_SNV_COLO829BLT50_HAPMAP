@@ -31,7 +31,7 @@ As the cell lines were cultured in preparation for the generation of the COLO829
 [4.admixture-only](4.admixture-only).
 
 We benchmarked 12 different somatic variant calling approaches against the thoroughly prepared reference set of variants. All approaches are described in detail in the accompaning publication. While 11 approaces were provided by other groups in the SMaHT consortia, we employed Mutect2 and MosaicForecast in our provided approach. Details are described in 
-[5.benchmarking](5.benchmarking). Additionally, to mitigate recurrent, alignment-driven false positive SNVs enriched in difficult and extreme genomic regions, we impleented a cross-sample pileup filtering workflow using an independent control sample, which we recommend as best practise. Details for this recommended filtering step are described in 
+[5.benchmarking](5.benchmarking). Additionally, to mitigate recurrent, alignment-driven false positive SNVs enriched in difficult and extreme genomic regions, we implemented a cross-sample pileup filtering workflow using an independent control sample, which we recommend as best practise. Details for this recommended filtering step are described in 
 [8.cross-platform_artifact_filtering](8.cross-platform_artifact_filtering). 
 The resulting call sets of all 12 approaches can be found in [7.call_sets](7.call_sets).
 

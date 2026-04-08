@@ -85,7 +85,6 @@ rule filter:
         runtime = 1800
     shell:
         """
-        pwd
         python3 {script_path}/filter_calls.py \
         --input_vcf_pu {input.pileup_vcf_norm} \
         --target_bam {input.short_read_target_bam} \
