@@ -4,13 +4,12 @@
 #SBATCH -p priopark
 #SBATCH -A park_contrib
 #SBATCH --mem=32G
-#SBATCH -o /n/scratch/users/d/dm334/slurm/%a.log
-#SBATCH -e /n/scratch/users/d/dm334/slurm/%a.log
-#SBATCH --array=1-605
+#SBATCH -o %a.log
+#SBATCH -e %a.log
+#SBATCH --array=-0-61
 
 # This script runs Sentieon Haplotyper (GATK HaplotypeCaller) in GVCF mode for a single sample
-# This script was run for Illumina COLO829BL and COLO829T to get homozygous-reference sites for negative control and variant sites for further analysis
-
+# This script was run for PacBio COLO829BL and COLO829T to get homozygous-reference sites for negative control and variant sites for further analysis
 
 while [ "$1" != "" ]; do
     case $1 in
@@ -102,7 +101,7 @@ input_files+=" $replace_args -i $input_bam "
 
 
 echo "Sentieon Haplotyper"
-command="/n/data1/hms/dbmi/park/SOFTWARE/Sentieon/sentieon-genomics-202503.01/bin/sentieon driver -t 16 $shards -r $reference $input_files --algo Haplotyper -d $known_snps --emit_mode gvcf ${output}_${job}.vcf.gz"
+command="sentieon driver -t 16 $shards -r $reference $input_files --algo Haplotyper -d $known_snps --emit_mode gvcf ${output}_${job}.vcf.gz"
 
 eval $command || exit 1
 

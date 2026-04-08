@@ -8,8 +8,8 @@
 
 module load bedtools
 
-regions=("/n/data1/hms/dbmi/park/jiny/SMaHT/Region_benchmark/Release_Genomic_Stratification_v2/SMaHT_easy_v2.bed.gz" "/n/data1/hms/dbmi/park/jiny/SMaHT/Region_benchmark/Release_Genomic_Stratification_v2/SMaHT_difficult_v2.bed.gz" "/n/data1/hms/dbmi/park/jiny/SMaHT/Region_benchmark/Release_Genomic_Stratification_v2/SMaHT_extreme_v2.bed.gz")
-region_names=("/n/data1/hms/dbmi/park/dominika/testing/smaht/COLO829/negative_control/NegativeControlSet/merged_sorted/regions/NegativeControlEasy_v2" "/n/data1/hms/dbmi/park/dominika/testing/smaht/COLO829/negative_control/NegativeControlSet/merged_sorted/regions/NegativeControlDifficult_v2" "/n/data1/hms/dbmi/park/dominika/testing/smaht/COLO829/negative_control/NegativeControlSet/merged_sorted/regions/NegativeControlExtreme_v2")
+regions=("SMaHT_easy_v2.bed.gz" "SMaHT_difficult_v2.bed.gz" "SMaHT_extreme_v2.bed.gz")
+region_names=("NegativeControlEasy_v2" "NegativeControlDifficult_v2" "NegativeControlExtreme_v2")
 
 for r in "${region_names[@]}"; do
     > ${r}.bed

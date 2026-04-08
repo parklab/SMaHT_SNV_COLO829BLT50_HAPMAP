@@ -1,6 +1,6 @@
 import os
 
-configfile: "/n/data1/hms/dbmi/park/jiny/SMaHT/COLO829/2.Github/3.negative_control/Snakemake/config/config.yaml"
+#configfile: "config/config.yaml"
 
 start = int(config.get("start", 0))
 end   = int(config.get("end", 1))

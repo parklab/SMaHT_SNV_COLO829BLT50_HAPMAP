@@ -8,8 +8,6 @@ blood_bam_genotype = sys.argv[4]
 
 vcf_obj = vcf_parser.Vcf(vcf)
 
-#tumor_bam_genotype = "/n/data1/hms/dbmi/park-smaht_dac/analysis/GCC_UW/COLO829T/pacbioHifi_bulkFiberSeq/seq_data/COLO829T_Hifi_ReplacedRG.bam"
-#blood_bam_genotype = "/n/data1/hms/dbmi/park/dominika/testing/smaht/negative_control/WGS/PacBio/COLO829BL/multiple_rg_2/COLO829_ReplacedreadGroups.bam"
 variants_output = list()
 variant_remove = set()
 with open(

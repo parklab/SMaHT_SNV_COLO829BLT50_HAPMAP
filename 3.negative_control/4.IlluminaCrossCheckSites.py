@@ -14,17 +14,14 @@ def load_variants(vcf):
     return variants
 
 
-vcf = sys.argv[1] #Mpilup q/Q=30 pileups VCF
-index = sys.argv[2] #Job ID
+vcf = sys.argv[1]  # Mpilup q/Q=30 pileups VCF
+index = sys.argv[2]  # Job ID
 tumor_bam_genotype = sys.argv[3]
 blood_bam_genotype = sys.argv[4]
 
 vcf_obj = vcf_parser.Vcf(vcf)
-#tumor_bam_genotype = "/n/data1/hms/dbmi/park-smaht_dac/analysis/GCC_UW/COLO829T/pacbioHifi_bulkFiberSeq/seq_data/COLO829T_Hifi_ReplacedRG.bam"
-#blood_bam_genotype = "/n/data1/hms/dbmi/park/dominika/testing/smaht/negative_control/WGS/PacBio/COLO829BL/multiple_rg_2/COLO829_ReplacedreadGroups.bam"
-PacBioq1_variants = load_variants(
-    f"PU1_PacBio/PU1_PacBio_{index}.norm.vcf"
-)
+
+PacBioq1_variants = load_variants(f"PU1_PacBio/PU1_PacBio_{index}.norm.vcf")
 alternates = {}
 
 for vnt in vcf_obj.parse_variants():
@@ -46,4 +43,6 @@ with open(
             if AD_1 == 0 or AD_2 == 0:
                 for alt in PacBioq1_variants[f"{vnt.CHROM}_{vnt.POS}_{vnt.REF}"]:
                     if alt != "<*>":
-                        fo.write(f"{vnt.CHROM}\t{int(vnt.POS) - 1}\t{int(vnt.POS)}\t{vnt.REF}\t{alt}\n")
+                        fo.write(
+                            f"{vnt.CHROM}\t{int(vnt.POS) - 1}\t{int(vnt.POS)}\t{vnt.REF}\t{alt}\n"
+                        )
