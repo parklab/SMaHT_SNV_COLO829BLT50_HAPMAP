@@ -6,7 +6,7 @@ variant_calls = config["variant_calls"]
 reference_genome = config["reference_genome"]
 output_pileup = variant_calls.replace(".vcf","").replace(".gz", "") 
 output_final = config["output_vcf"]
-
+output_path = "artifact_filtering/tmp"
 script_path = Path(workflow.basedir).parent / "scripts"
 
 rule all:
@@ -34,7 +34,7 @@ rule pileup:
         """
         
         rm -rf {params.tmpdir} {params.rawdir} {params.normdir}
-        mkdir -p {params.tmpdir} {params.rawdir} {params.normdir}
+        mkdir -p {params.tmpdir} {params.rawdir} {params.normdir} {output_path}
 
         # Step 1: Convert VCF to 0-based BED
         bcftools query -f'%CHROM\\t%POS\\t%POS\\n' {input.variant_calls} | \
